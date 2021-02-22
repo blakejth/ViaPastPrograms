@@ -1,0 +1,193 @@
+/*--------------------
+Created By: Blake Hancock
+
+Date: 1/30/2019
+
+Purpose: This file allows users in google sheets to take employee names for the Agents Q/A
+*/
+
+function getNames() {
+  
+  
+  //Grab both sheets within the google spreadsheet. This only pulls both the 'Assign' and 'Employees' sheet. If sheet names are changed the program
+  //will not function until the name of the sheets are changed.
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var EmployeeSheet = ss.getSheetByName("Employees");
+  var historySheet = ss.getSheetByName("History");
+  
+  
+  //The following code will grab the users name and split it leaving only first and last name. Because of this each user will need to do a one time 
+  //authorization for the application to read and display the users email. Once authorization is given it won't ask again. 
+  var name = getUser();
+  
+  
+  //Grabbing all names from sheet 'Employees' in column A. If Employees changes columns then the function will need to change as well. This uses the
+  //function getEmp() below. See line 
+  var allEmp = getEmp();
+  
+  //Work around to avoid two people taking the same Employee at the same time
+  var isRunning = ss.getRange("H1").getValue();
+  
+  //----------------------------------------------------------Main Function----------------------------------------------------------------------------
+  //Part of the above work around
+  if (isRunning == 0){
+  
+  ss.getRange("H1").setValue(isRunning+1);
+  
+  //This sets the value of the 'Previos' cell to the proper value. It just grabs and assigns the name of the employee in the cell above. That is why
+  //it updates first before pulling the next employee
+  ss.getRange("B6").setValue(ss.getRange("B5").getValue());
+  
+  
+  //Pulls the integer from Employee sheet so it knows who to pull next in the list. This number needs to be static at cell C2.
+  var counter = EmployeeSheet.getRange("C2").getValue();
+  
+  var today = new Date();
+  var hours = today.getHours();
+  var mins = today.getMinutes();
+    
+  var date = today + " - " + hours +":"+mins;
+  
+  var overRide = EmployeeSheet.getRange("E2").getValue();
+ 
+    
+
+  
+  //This will set poulate the Up Next and the Previous cell for sheet "Assign". It will also update the value as needed to the counter for the line above
+    
+    
+  if (overRide !== "") {
+    ss.getRange("B5").setValue(overRide);
+    EmployeeSheet.getRange("E2").setValue("");
+  } else if (counter == allEmp.length) {
+    ss.getRange("B5").setValue(allEmp[0]);
+    EmployeeSheet.getRange("C2").setValue(1);    
+  } else {
+    ss.getRange("B5").setValue(allEmp[counter]);
+    EmployeeSheet.getRange("C2").setValue(counter+1);
+  }
+  
+  
+  //This sets the taken by cell by grabbing the users email address. Permission needs to be granted or this will not work.
+  ss.getRange("D6").setValue(name);
+    
+    
+    var currentEmp = ss.getRange("B6").getValue();
+    
+    //Send info to history
+    writeHistory(name, currentEmp, date);
+    
+    //Work around for if someone else is running the program at the same time
+    ss.getRange("H1").setValue(0);
+    
+    
+    
+  } else {
+    SpreadsheetApp.getUi().alert("Someone else is running grabbing that name, try again!");
+  }
+  
+  //This feature confirms the person who has been taken
+  //SpreadsheetApp.getUi().alert("You grabbed " + allEmp[counter-1]);
+  
+}
+//--------------------------------------------------------End of main function----------------------------------------------------------
+
+
+function getUser() {
+  var user = new String(Session.getActiveUser());
+  ui = SpreadsheetApp.getUi();
+  var name = user.split("@");
+  return name;
+}
+
+
+function getEmp(){
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var EmployeeSheet = ss.getSheetByName("Employees"); 
+  
+  var empNumb = EmployeeSheet.getRange("B2").getValue();
+  var allEmp = EmployeeSheet.getRange("A1:A" + empNumb).getValues(); 
+  return allEmp;
+}
+
+
+function reset() {
+  
+  var user = new String(Session.getActiveUser());
+ 
+  var authorizedUser = "blakejth@gmail.com";
+  
+  
+  if (user == authorizedUser) {
+  
+  //Grabbing all names from sheet 'Employees' in column A.
+  var allEmp = getEmp();
+  
+  //Grab the current file
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  //reset counter
+  ss.getRange("C2").setValue(1);
+  
+  //reset assignments on the 'Assign' sheet
+  var assignmentSheet = ss.getSheetByName("Assign");
+  assignmentSheet.getRange("D6").setValue("");
+  assignmentSheet.getRange("B5").setValue(allEmp[0]);
+  assignmentSheet.getRange("B6").setValue("");
+    
+  } else {
+    SpreadsheetApp.getUi().alert("You are not authorized to reset.");
+}
+}
+
+
+function writeHistory(qa, emp, currentTime) {
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var EmployeeSheet = ss.getSheetByName("Employees");
+  var historySheet = ss.getSheetByName("History");
+  
+  var historyCounter = historySheet.getRange("E2").getValue();
+  
+  
+  historySheet.getRange("A"+ historyCounter).setValue(qa);
+  historySheet.getRange("b"+ historyCounter).setValue(emp);
+  historySheet.getRange("c"+ historyCounter).setValue(currentTime);
+  
+  historySheet.getRange("H2").setValue(historyCounter + 1);
+    
+}
+
+/**
+ * Sends emails with data from the current spreadsheet.
+ */
+function sendEmail() {
+  
+  var ui = SpreadsheetApp.getUi();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var email = ui.prompt("Where do you want to send this? (email address):").getResponseText();
+  var historyCounter = sheet.getRange("E2").getValue();
+  var body = "";
+  var today = new Date();
+  var hours = today.getHours();
+  var mins = today.getMinutes(); 
+  var date = today + " - " + hours +":"+mins;
+  var subject = "History of audits pulled: " + date;
+  
+  for (var i = 2; i < historyCounter+2; i++){
+    
+    var spacer = " : ";
+    var firstVal = sheet.getRange("A"+i).getValue();
+    var secondVal = sheet.getRange("B"+i).getValue();
+    var thirdVal = sheet.getRange("C"+i).getValue();
+    
+    if (body === ""){
+      var body = firstVal + spacer + secondVal + spacer + thirdVal + "\n";
+    } else {
+    var body = body + firstVal + spacer + secondVal + spacer + thirdVal + "\n";
+    }
+  }
+ 
+   MailApp.sendEmail(email, subject, body);
+  }
+

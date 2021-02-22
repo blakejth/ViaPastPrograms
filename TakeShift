@@ -1,0 +1,39 @@
+function takeShift() {
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheets()[0];
+  
+    //The following code will grab the users name and split it.
+  var user = new String(Session.getActiveUser()),
+  ui = SpreadsheetApp.getUi();
+  var name = user.split("@");
+    //end
+  
+    //The following code will get the current selected cell
+  var cell = SpreadsheetApp.getActive().getActiveRange().getA1Notation();
+    //end
+ 
+  /*The following if statement will check to see if the cell is blank
+    and if it is it will assign the the user by email and change the 
+    background. If not do nothing.
+  */
+  if (sheet.getRange(cell).isBlank()) {
+    
+      //ui.alert("The selected slot is open and is yours!");
+    var response = ui.prompt("You are about to pick up another shift. \nPlease confirm.", ui.ButtonSet.YES_NO);
+   if (response.getSelectedButton() == ui.Button.YES) {
+        ui.alert("The shift is yours!")
+        sheet.getRange(cell).setValue(name[0]);
+        sheet.getRange(cell).setBackgroundColor("#FFFF00");
+    }   else{
+      return
+    }
+    
+  } else {
+    
+    ui.alert("The selected slot has been taken. Gab something else!");
+    
+  }
+    //end
+
+}
